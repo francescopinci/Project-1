@@ -1,18 +1,3 @@
-Secure Computer Systems: Project 1
-==========================================
-
-Goal
-
-The goal of this assignment is to gain hands-on experience with the effect of buffer overflows and other memory-safety bugs.
-
-All work in this project must be done in the QEMU virtual machine provided on the course website; see below for information about this environment.
-
-You are given, in the targets directory, the source code for six exploitable programs, target1, …, target6. These programs are to be compiled and installed, setuid root, in the /tmp directory of your VM. Your goal is to write six exploit programs sploit1, …, sploit6, each of which will execute the corresponding target with input that exploits that target’s bug, giving a root shell on the VM.
-
-In fact, you are not given a fixed set of targets. Instead, the targets will be generated from an ID file that you must first fill out (see below).
-
-We have provided skeletons for these exploits programs in the sploits directory, as sploit1.c, …, sploit6.c. Our own solutions, incidentally, are very short: fewer than 50 lines each. So while understanding and exploiting the bugs will not be easy, you will not need to write a lot of code.
-
 GDB tips
 --------
 
