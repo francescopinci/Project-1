@@ -1,0 +1,49 @@
+This sploit exploits a bug in 'log_attempt' function.
+In the for cycle condition, the size check does not consider that
+strcat will write the terminating character \0 at the end of the
+string. This cause that, if the last argument is written to fill
+exactly the remaining bytes of the log, the byte of memory after log
+will be changed to 0 value. Since log, log_size and authorized are
+static variables, they are located in the memory one next to the
+other. Debugging the program can be seen that the memory is allocated
+as follow:
+___________________________________________________________________
+
+|            log (1116 bytes)           |  log_size  |  authorized |  
+___________________________________________________________________
+
+This situazion implies that the byte which will be modified to '\0' is
+a the lsb byte of log_size. Modifying it, the value of log_size will
+be reduced and at the next iteration if the next argument we pass is
+smaller than (sizeof log-reduced_log_size) it will be added to log.
+Entering the loop this is what will happen:
+- the element of log at position log[reduced_log_size] is set to ' '.
+This doesn't matter to us.
+- the for bytes of log_size will be set to 0xNN 0xNN 0x00 0x00 where
+  the first two are the lsb containing the updated value.
+- now strcat will add our next argument exactly after 0xNN 0xNN
+  considering the 0x00 as the end of the string log.
+With this argument we will overwrite the value of authorized and since
+it is given by us we can set it to get two results:
+1 - set the msb of log_size to 1 in order to exploit an integer
+overflow over log_size on the for loop condition. If the msb is set to
+1, it will be seen as a negative number which will imply to always
+satisfy the condition and so write on log as much as we want.
+2 - set the lsb of authorized to 1 and so make our arguments be
+executed by execvp in the main program.
+To get this we can for example set the argument to: 
+0xff 0xff 0x01 0x00
+msb of   | lsb of 
+log_size | authorized
+
+At this point, the program will execute the command we passed with the
+arguments we passed and it will let us do it also giving a wrong
+password.
+
+To avoid that the charatcter edited by log[reduced_log_sized] and
+log_size (they are actually characters in the log string since the \0
+is found only afther the 0x01 of authorized) is not given as argument 
+to our command we can first call a new shell giving it as argument to
+the execvp, set -c as next argumend to make it execute the next 
+argument and give echo as last argument. It will print anything we 
+passed after it and close itself disarding the value.

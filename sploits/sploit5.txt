@@ -1,0 +1,72 @@
+This sploit exploits a vulnerability in the combine_string function. When the
+chunk b is reallocated, it could happen that the amount of space available
+in the heap between it and the next chunk is not enough to fit the combination
+of the data.
+In such situation, the combined data is placed in a new chunk pointed by
+string_table[a] and the element b is freed. Here the function has a bug: the
+pointer to the element b which is in the string_table is not removed or
+updated. This means that now we can write over the chunk b reallocating the
+chunk immediatly before it but still call any of the program functions passing
+string_table[b]. 
+If we overwrite chunk b left and right pointer with custom pointers and call
+free on it we are able to execute our shell code.
+Specifically we have to reallocate chunk a in order to fill all the bytes
+which were previously allocated for the chunk and append to them 2 pointers:
+the pointer to a jump instruction and the pointer to the memory element right
+before the return value. 
+Calling free on chunk b, the return value will be replaced with the address of
+the jump so that when the program return it execute the jump instruction and
+the shell code consequently.
+
+In order to get this exploit working many details and additional problems have
+to be faced:
+- the shell code and the jump instructions have to be on stack in order to be
+  executed. This can be done by placing them in an environment variable
+  which will be located in the memory over the main return address.
+- the shell code contains hexadecimal values so in case we use any string
+  function to create them, each value will be converted to its a
+  ASCII. This is a problem becuase there is the 0x0a value which represents
+  '\n' and so stop string functions to read what is next. This problem is
+  solved by using memcpy which copy the bytes without taking care of what is
+  inside.
+- The same problem is faced when writing the 2 addresses to be replaced in the
+  file we input to the program. So we used c code to create and write the
+  input file for target.
+- we calculated the jump code by writing a small c program including assembler
+  instructions. The branch instruction had to reach an element separated from
+  it by some nops. Nops value are 4 bytes long so any jump we can get is a
+  multiple of 4. Since our jump instruction has to jump backward of 4(jump
+  instruction bytes)+37(shellcode bytes), the first multiple of 4 we could
+  choose was 44. To get a jump of 44 we placed 11 nops between our destination
+  and the branch instruction. Running the program and watching its assembly we
+  obtained the jump instruction needed. The 3 values between the end of the 
+  shellcode and the jump are filled with garbage to aline the shell to 40 bytes.
+- During the free process of chunk b, the sfree function execute
+  'CLEAR_IN_USE()' over it which subtract 1 to the value of b->right. This
+  operation is used by the function to indicat that now this chunk is no more
+  in use. Since the value of b->right is the one we wrote with the address of
+  the 4 bytes before the return address, it has to be set as return_address-3
+  instead of -4.
+- Always during the free process, sfree function will check if the chunk
+  before b is used or not by calling IS_IN_USE(b->left). We want it to be seen
+  as free. IS_IN_USE will check this value (b->left)->right: b->left has been
+  set by us to point to the jump code, the right value of it means the value
+  at +4 from its addres. To be seen as free require a 0 in the lsb, so the
+  block of memory next to the jump has to be set to any even number.
+
+In order to be able to overwrite memory of chunk b we executed the following
+commands in the program:
+create 0 a	//this is the element we will reallocate to overwrite b
+create 1 b	//this is the element which will be overwritten and freed
+create 2 c..c	//this is a long element used to make b too small to contain
+	  	  the combination with it
+combine 2 1 2	//at this poin element one is no more in use but we still have
+    		  a pointer to it
+create 0 a..ajump_addrret_addr-3	//the first a's will fill up the
+chunck space till the position where we want to edit the pointers and then
+put the jump addresso followed by the return address as specified bfore
+delete 1	//this call free on element 1 which has been overwritten
+
+A last notice: we decided to use the main function return address to be
+substituted with our jump address. It would work also using the return address
+of the delete function.

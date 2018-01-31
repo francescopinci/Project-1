@@ -1,0 +1,23 @@
+-----BUILDING SECURE COMPUTER SYSTEMS-----
+-----------PROJECT 1 - SPLOIT 1-----------
+
+This sploit exploits the vulnerability of strcpy(buf, arg) in function foo,
+performing a standard buffer overflow.
+String arg is copied into buf without any boundaries check, and this allows us
+to write past buf itself, overwriting the function return address to make it
+point to our desired location.
+In this case, such location is the address of buf where the shellcode is
+stored, and we decided to put it at the beginning of buf.
+In order to write to the correct location (the original return
+address), we needed to get the address difference between buf (&buf[0]) and
+the saved instruction pointer, to which foo returns after it finishes its job.
+This number is then used to compute the size of arg1 in our sploit.
+Since the computed size is bigger than strlen(shellcode), some padding made of
+dummy characters (0x55) is introduced. 
+To summarize, our arg1 looks like:
+
+ ____________________________________________________________
+|           |		         |			|    |
+| shellcode |  dummy characters  | &arg[0] = 0xbefffba4 | \0 |
+|___________|____________________|______________________|____|
+0	  36 37	              271 272	 	     275 276
